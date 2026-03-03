@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>HAKAI</title>
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Hakai">
+    
+    <link rel="apple-touch-icon" href="https://img.icons8.com/ios-filled/512/ff00cc/flash-on.png">
+    <link rel="icon" type="image/png" href="https://img.icons8.com/ios-filled/512/ff00cc/flash-on.png">
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { height:100vh; display:flex; flex-direction:column; justify-content:center; align-items:center; background:#070012; overflow:hidden; }
+        body::before { content:""; position:absolute; width:600px; height:600px; background: radial-gradient(circle, rgba(255,0,204,0.1), transparent 70%); filter: blur(120px); right:5%; top:15%; z-index: -1; }
+        
+        .card { width:95%; max-width:550px; border-radius:40px; padding:30px; position:relative; background: rgba(255,255,255,0.02); backdrop-filter: blur(30px); border:1px solid rgba(255,0,200,0.2); box-shadow: 0 20px 50px rgba(0,0,0,0.6); }
+        .lightning { position:absolute; left:-35px; top:-25px; width:110px; z-index: 2; }
+        .lightning path { stroke:#ff00cc; stroke-width:6; fill:none; filter: drop-shadow(0 0 12px #ff00cc); }
+        
+        .title { font-size:32px; font-weight:300; color:white; letter-spacing: 6px; text-transform: uppercase; margin-left: 60px; margin-bottom: 10px; }
+        .divider { height:1px; background: linear-gradient(to right, transparent, rgba(255,255,255,0.1), transparent); margin:20px 0; }
+        
+        .input-group { position: relative; display: flex; align-items: center; }
+        input { width: 100%; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); padding: 18px 60px 18px 18px; border-radius: 18px; color: white; outline: none; transition: 0.4s; font-size: 14px; }
+        
+        .mic-container { position: absolute; right: 18px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .mic-ring { width: 10px; height: 10px; border: 1.5px solid rgba(255,0,204,0.4); border-radius: 50%; transition: 0.3s; }
+        .active .mic-ring { width: 16px; height: 16px; border-color: #ff00cc; box-shadow: 0 0 10px #ff00cc; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.3); opacity: 0.5; } 100% { transform: scale(1); opacity: 1; } }
+        
+        #response { margin-top: 20px; font-size: 11px; color: rgba(255,255,255,0.8); line-height: 1.5; max-height: 380px; overflow-y: auto; padding-right: 5px; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; background: rgba(0,0,0,0.2); border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.05); }
+        th { background: rgba(255,0,204,0.15); color: #ff00cc; text-align: left; padding: 12px; font-weight: 600; text-transform: uppercase; font-size: 9px; }
+        td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.03); color: #eee; }
+        
+        .neg { color: #ff4d4d !important; font-weight: 600; }
+        .pos { color: #00ff88 !important; font-weight: 600; }
+        
+        #response::-webkit-scrollbar { width: 3px; }
+        #response::-webkit-scrollbar-thumb { background: rgba(255,0,204,0.2); }
+        .user-tag { position: absolute; top: 20px; right: 40px; font-size: 8px; color: #ff00cc; letter-spacing: 2px; opacity: 0.7; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+
+<div class="card">
+    <div id="user-display" class="user-tag"></div>
+    <svg class="lightning" viewBox="0 0 100 150">
+        <path d="M60 0 L20 80 L55 80 L35 150 L85 60 L50 60 Z"/>
+    </svg>
+    <div class="title">Hakai</div>
+    <div class="divider"></div>
+    <div class="input-group">
+        <input type="text" id="user-input" placeholder="Comando..." onkeypress="if(event.key==='Enter') processData()">
+        <div class="mic-container" id="mic-toggle" onclick="toggleMic()"><div class="mic-ring"></div></div>
+    </div>
+    <div id="response">Sincronizando flujo...</div>
+</div>
+
+<script>
+    // Toda la lógica de GitHub, Groq y Voz se mantiene igual
+    const GH_TOKEN = localStorage.getItem('h_gh_token');
+    const GIST_ID = localStorage.getItem('h_gist_id');
+    const GROQ_KEY = localStorage.getItem('h_groq');
+    const USER_NAME = localStorage.getItem('h_user');
+    let state = { categorias: {}, historial: [] };
+
+    function applyColors() {
+        document.querySelectorAll('td').forEach(cell => {
+            const val = cell.innerText;
+            if (val.includes('-') || val === '0') cell.classList.add('neg');
+            if (val.includes('+')) cell.classList.add('pos');
+        });
+    }
+
+    async function loadCloud() {
+        if (!GH_TOKEN || !GIST_ID || !GROQ_KEY || !USER_NAME) {
+            let n = prompt("Nombre:"); if(n) localStorage.setItem('h_user', n);
+            let t = prompt("Token:"); if(t) localStorage.setItem('h_gh_token', t);
+            let g = prompt("Gist ID:"); if(g) localStorage.setItem('h_gist_id', g);
+            let k = prompt("Groq Key:"); if(k) localStorage.setItem('h_groq', k);
+            location.reload(); return;
+        }
+        try {
+            const res = await fetch(`https://api.github.com/gists/${GIST_ID}?t=${Date.now()}`, { headers: { "Authorization": `token ${GH_TOKEN}` } });
+            const data = await res.json();
+            state = JSON.parse(data.files["hakai.json"].content);
+            document.getElementById('user-display').innerText = USER_NAME;
+            document.getElementById('response').innerText = "Hakai Online.";
+        } catch (e) { document.getElementById('response').innerText = "Error de enlace."; }
+    }
+
+    async function processData() {
+        const inputField = document.getElementById('user-input');
+        const input = inputField.value;
+        const resDiv = document.getElementById('response');
+        if (!input) return;
+
+        resDiv.innerHTML = "...";
+        await loadCloud(); 
+
+        try {
+            const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+                headers: { "Authorization": `Bearer ${GROQ_KEY}`, "Content-Type": "application/json" },
+                method: "POST",
+                body: JSON.stringify({ 
+                    model: "llama-3.3-70b-versatile",
+                    messages: [
+                        { role: "system", content: `IA de finanzas. REGLAS: 1. Detalle completo pide semana/mes si no se especifica. 2. Tablas Markdown para saldos e historial filtrado. 3. JSON tras ###.` },
+                        { role: "user", content: `Estado: ${JSON.stringify(state)}. Comando: ${input}` }
+                    ],
+                    temperature: 0
+                }),
+            });
+            const data = await response.json();
+            const rawText = data.choices[0].message.content;
+            
+            if (rawText.includes('###')) {
+                const parts = rawText.split('###');
+                const cleanJson = parts[parts.length - 1].trim().substring(parts[parts.length - 1].trim().indexOf('{'), parts[parts.length - 1].trim().lastIndexOf('}') + 1);
+                state = JSON.parse(cleanJson);
+                await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                    method: 'PATCH',
+                    headers: { "Authorization": `token ${GH_TOKEN}` },
+                    body: JSON.stringify({ files: { "hakai.json": { content: JSON.stringify(state) } } })
+                });
+                resDiv.innerHTML = marked.parse(parts[0].trim());
+                applyColors();
+            } else { resDiv.innerText = rawText.trim(); }
+            inputField.value = "";
+            resDiv.scrollTop = 0;
+        } catch (e) { resDiv.innerText = "Error."; }
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition;
+    if (SpeechRecognition) {
+        recognition = new SpeechRecognition();
+        recognition.lang = 'es-CL';
+        recognition.onresult = (e) => { document.getElementById('user-input').value = e.results[0][0].transcript; processData(); };
+        recognition.onend = () => document.getElementById('mic-toggle').classList.remove('active');
+    }
+    function toggleMic() { if(recognition){ document.getElementById('mic-toggle').classList.add('active'); recognition.start(); } }
+
+    loadCloud();
+</script>
+</body>
+</html>
