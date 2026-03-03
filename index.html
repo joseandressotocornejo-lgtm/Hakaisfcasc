@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HAKAI | Sistema de Flujo</title>
+    <title>HAKAI</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
         * { margin:0; padding:0; box-sizing:border-box; font-family: 'Inter', sans-serif; }
@@ -22,7 +22,7 @@
         button { flex:1; padding:14px; border-radius:16px; border:1px solid rgba(255,255,255,0.05); background: rgba(255,255,255,0.03); color:rgba(255,255,255,0.6); cursor:pointer; transition:0.3s; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
         .confirm { background: linear-gradient(45deg,#9d00ff,#ff00cc); border:none; color:white; }
         .confirm:hover { box-shadow:0 15px 30px rgba(255,0,200,0.4); transform:translateY(-2px); }
-        .token-hint { position: absolute; bottom: 10px; font-size: 9px; color: rgba(255,255,255,0.1); cursor: pointer; }
+        .token-hint { position: absolute; bottom: 10px; font-size: 9px; color: rgba(255,255,255,0.1); cursor: pointer; text-decoration: none; }
     </style>
 </head>
 <body>
@@ -36,7 +36,7 @@
     <div class="input-area">
         <input type="text" id="user-input" placeholder="Dime qué ocurrió hoy..." onkeypress="if(event.key==='Enter') processData()">
     </div>
-    <div id="response">Hakai lista. Modelo: Estable.</div>
+    <div id="response">Hakai en línea. Lista para el flujo.</div>
     <div class="buttons">
         <button class="confirm" onclick="processData()">Sincronizar</button>
         <button onclick="exportarExcel()">Reporte</button>
@@ -46,14 +46,14 @@
 
 <script>
     let HF_TOKEN = localStorage.getItem('hakai_token'); 
-    let state = JSON.parse(localStorage.getItem('hakai_v7')) || {
+    let state = JSON.parse(localStorage.getItem('hakai_v8')) || {
         total: 0,
         categorias: { arriendo: 0, mercaderia: 0, transporte: 0, salud: 0, ahorro: 0, personal: 0 },
         logs: []
     };
 
     function updateUI() {
-        localStorage.setItem('hakai_v7', JSON.stringify(state));
+        localStorage.setItem('hakai_v8', JSON.stringify(state));
         if(HF_TOKEN) localStorage.setItem('hakai_token', HF_TOKEN);
     }
 
@@ -74,56 +74,59 @@
 
         if (!input) return;
         resDiv.style.color = "#ff4df3";
-        resDiv.innerText = "Sincronizando flujo...";
+        resDiv.innerText = "Conectando con núcleo de respaldo...";
 
-        const promptIA = `<|im_start|>system
-Eres Hakai, asistente financiero. Si el usuario gasta y excede una categoría, resta de 'ahorro' y avisa reposición mes próximo. Aprende hábitos. Responde breve y termina con ### y el JSON nuevo.<|im_end|>
-<|im_start|>user
-Estado actual: ${JSON.stringify(state)}. Usuario dice: "${input}"<|im_end|>
-<|im_start|>assistant`;
+        const promptIA = `<s>[INST] Eres Hakai, asistente financiero. 
+        REGLAS:
+        1. Si un gasto excede el presupuesto de una categoría, resta de 'ahorro' y avisa reposición.
+        2. Al final de tu texto añade ### seguido del JSON actualizado.
+        Estado actual: ${JSON.stringify(state)}
+        Usuario dice: "${input}" [/INST]`;
 
-        // INTENTOS AUTOMÁTICOS (3 VECES)
         for (let i = 0; i < 3; i++) {
             try {
-                const response = await fetch("https://api-inference.huggingface.co/models/Qwen/Qwen2.5-72B-Instruct", {
+                const response = await fetch("https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3", {
                     headers: { "Authorization": `Bearer ${HF_TOKEN}`, "Content-Type": "application/json" },
                     method: "POST",
-                    body: JSON.stringify({ inputs: promptIA, parameters: { max_new_tokens: 500 } }),
+                    body: JSON.stringify({ 
+                        inputs: promptIA, 
+                        parameters: { max_new_tokens: 500, wait_for_model: true } 
+                    }),
                 });
 
                 if (response.ok) {
                     const result = await response.json();
-                    let rawText = result[0].generated_text.split('<|im_start|>assistant')[1] || result[0].generated_text;
+                    const rawText = result[0].generated_text.split('[/INST]')[1] || result[0].generated_text;
                     
                     const parts = rawText.split('###');
-                    const mensaje = parts[0].trim();
-                    const jsonPart = parts[1];
-
-                    if(jsonPart) {
-                        try { state = JSON.parse(jsonPart.trim()); updateUI(); } catch(e) {}
+                    if(parts[1]) {
+                        try {
+                            state = JSON.parse(parts[1].trim());
+                            updateUI();
+                        } catch(e) { console.error("Error en JSON"); }
                     }
 
                     resDiv.style.color = "rgba(255,255,255,0.8)";
-                    resDiv.innerText = mensaje;
+                    resDiv.innerText = parts[0].trim();
                     inputField.value = "";
                     return; 
                 }
                 
-                resDiv.innerText = `Cerebro ocupado... reintentando (${i+1}/3)`;
-                await new Promise(r => setTimeout(r, 1500)); 
+                resDiv.innerText = `Buscando señal... intento ${i+1}/3`;
+                await new Promise(r => setTimeout(r, 2000)); 
 
             } catch (e) {
-                if (i === 2) resDiv.innerText = "Hugging Face saturado. Intenta en 10 segundos.";
+                if (i === 2) resDiv.innerText = "Servidores saturados. Intenta en un momento.";
             }
         }
     }
 
     function exportarExcel() {
-        const content = "HAKAI STATUS\n" + JSON.stringify(state, null, 2);
+        const content = "HAKAI REPORT\n" + JSON.stringify(state, null, 2);
         const blob = new Blob([content], {type: 'text/plain'});
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = 'Hakai_Status.txt'; a.click();
+        a.download = 'Hakai_Reporte.txt'; a.click();
     }
 </script>
 </body>
