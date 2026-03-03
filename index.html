@@ -6,69 +6,23 @@
     <title>HAKAI | Sistema de Flujo</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
-        /* ESTÉTICA HAKAI REFINADA */
         * { margin:0; padding:0; box-sizing:border-box; font-family: 'Inter', sans-serif; }
-        body { 
-            height:100vh; display:flex; flex-direction:column; justify-content:center; 
-            align-items:center; background:#070012; overflow:hidden; 
-        }
-
-        body::before {
-            content:""; position:absolute; width:600px; height:600px;
-            background: radial-gradient(circle, rgba(255,0,255,0.12), transparent 70%);
-            filter: blur(120px); right:5%; top:15%; z-index: -1;
-        }
-
-        .card {
-            width:90%; max-width:500px; border-radius:40px; padding:40px; position:relative;
-            background: rgba(255,255,255,0.02); backdrop-filter: blur(30px);
-            border:1px solid rgba(255,0,200,0.2);
-            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
-        }
-
+        body { height:100vh; display:flex; flex-direction:column; justify-content:center; align-items:center; background:#070012; overflow:hidden; }
+        body::before { content:""; position:absolute; width:600px; height:600px; background: radial-gradient(circle, rgba(255,0,255,0.12), transparent 70%); filter: blur(120px); right:5%; top:15%; z-index: -1; }
+        .card { width:90%; max-width:500px; border-radius:40px; padding:40px; position:relative; background: rgba(255,255,255,0.02); backdrop-filter: blur(30px); border:1px solid rgba(255,0,200,0.2); box-shadow: 0 20px 50px rgba(0,0,0,0.6); }
         .lightning { position:absolute; left:-35px; top:-25px; width:110px; z-index: 2; }
         .lightning path { stroke:#ff00cc; stroke-width:6; fill:none; filter: drop-shadow(0 0 12px #ff00cc); }
-
-        .title { 
-            font-size:38px; font-weight:300; color:white; 
-            letter-spacing: 6px; text-transform: uppercase;
-            margin-left: 60px; margin-bottom: 10px;
-        }
-
+        .title { font-size:38px; font-weight:300; color:white; letter-spacing: 6px; text-transform: uppercase; margin-left: 60px; margin-bottom: 10px; }
         .divider { height:1px; background: linear-gradient(to right, transparent, rgba(255,255,255,0.1), transparent); margin:25px 0; }
-
         .input-area { margin-top: 20px; position: relative; }
-        input {
-            width: 100%; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1);
-            padding: 18px; border-radius: 18px; color: white; outline: none; transition: 0.4s;
-            font-size: 14px; font-weight: 300;
-        }
-        input:focus { border-color: #ff00cc; background: rgba(255,0,200,0.04); box-shadow: 0 0 15px rgba(255,0,200,0.1); }
-
-        #response { 
-            margin-top: 20px; font-size: 14px; color: rgba(255,255,255,0.5); 
-            line-height: 1.6; min-height: 40px; font-weight: 300;
-        }
-
+        input { width: 100%; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); padding: 18px; border-radius: 18px; color: white; outline: none; transition: 0.4s; font-size: 14px; font-weight: 300; }
+        input:focus { border-color: #ff00cc; background: rgba(255,0,200,0.04); }
+        #response { margin-top: 20px; font-size: 14px; color: rgba(255,255,255,0.5); line-height: 1.6; min-height: 40px; font-weight: 300; }
         .buttons { display:flex; gap:12px; margin-top:30px; }
-        button { 
-            flex:1; padding:14px; border-radius:16px; border:1px solid rgba(255,255,255,0.05); 
-            background: rgba(255,255,255,0.03); color:rgba(255,255,255,0.6); 
-            cursor:pointer; transition:0.3s; font-size: 11px; letter-spacing: 1px;
-            text-transform: uppercase;
-        }
-        button:hover { background: rgba(255,255,255,0.07); color:white; }
-        
-        .confirm { 
-            background: linear-gradient(45deg,#9d00ff,#ff00cc); border:none; color:white; 
-            box-shadow:0 10px 20px rgba(255,0,200,0.2);
-        }
+        button { flex:1; padding:14px; border-radius:16px; border:1px solid rgba(255,255,255,0.05); background: rgba(255,255,255,0.03); color:rgba(255,255,255,0.6); cursor:pointer; transition:0.3s; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
+        .confirm { background: linear-gradient(45deg,#9d00ff,#ff00cc); border:none; color:white; }
         .confirm:hover { box-shadow:0 15px 30px rgba(255,0,200,0.4); transform:translateY(-2px); }
-        
-        .token-hint {
-            position: absolute; bottom: 10px; font-size: 9px; color: rgba(255,255,255,0.1);
-            cursor: pointer; text-decoration: none;
-        }
+        .token-hint { position: absolute; bottom: 10px; font-size: 9px; color: rgba(255,255,255,0.1); cursor: pointer; }
     </style>
 </head>
 <body>
@@ -77,50 +31,35 @@
     <svg class="lightning" viewBox="0 0 100 150">
         <path d="M60 0 L20 80 L55 80 L35 150 L85 60 L50 60 Z"/>
     </svg>
-
     <div class="title">Hakai</div>
-    
     <div class="divider"></div>
-
     <div class="input-area">
-        <input type="text" id="user-input" placeholder="Dime qué ocurrió hoy..." onkeypress="handleKeyPress(event)">
+        <input type="text" id="user-input" placeholder="Dime qué ocurrió hoy..." onkeypress="if(event.key==='Enter') processData()">
     </div>
-    
-    <div id="response">Hakai en línea. Lista para procesar flujo.</div>
-
+    <div id="response">Hakai lista. Modelo: Estable.</div>
     <div class="buttons">
         <button class="confirm" onclick="processData()">Sincronizar</button>
         <button onclick="exportarExcel()">Reporte</button>
     </div>
-
     <a class="token-hint" onclick="resetToken()">Cambiar Token</a>
 </div>
 
 <script>
-    // CARGAR DATOS
     let HF_TOKEN = localStorage.getItem('hakai_token'); 
-    let state = JSON.parse(localStorage.getItem('hakai_v6')) || {
+    let state = JSON.parse(localStorage.getItem('hakai_v7')) || {
         total: 0,
         categorias: { arriendo: 0, mercaderia: 0, transporte: 0, salud: 0, ahorro: 0, personal: 0 },
         logs: []
     };
 
     function updateUI() {
-        localStorage.setItem('hakai_v6', JSON.stringify(state));
+        localStorage.setItem('hakai_v7', JSON.stringify(state));
         if(HF_TOKEN) localStorage.setItem('hakai_token', HF_TOKEN);
     }
 
-    function handleKeyPress(e) {
-        if (e.key === 'Enter') processData();
-    }
-
     function resetToken() {
-        const nuevo = prompt("Introduce tu nuevo Token de Hugging Face:");
-        if(nuevo) {
-            HF_TOKEN = nuevo;
-            updateUI();
-            alert("Token actualizado.");
-        }
+        const nuevo = prompt("Introduce tu Token de Hugging Face:");
+        if(nuevo) { HF_TOKEN = nuevo; updateUI(); location.reload(); }
     }
 
     async function processData() {
@@ -128,83 +67,63 @@
         const input = inputField.value;
         const resDiv = document.getElementById('response');
 
-        // Pedir token si no existe
-        if (!HF_TOKEN || HF_TOKEN === "null" || HF_TOKEN.length < 5) {
-            HF_TOKEN = prompt("Hakai requiere tu Token de Hugging Face (Gratis):");
-            if (HF_TOKEN) updateUI();
-            else return;
+        if (!HF_TOKEN) {
+            HF_TOKEN = prompt("Pega tu Token de Hugging Face:");
+            if (HF_TOKEN) updateUI(); else return;
         }
 
         if (!input) return;
-
         resDiv.style.color = "#ff4df3";
-        resDiv.innerText = "Sincronizando con el núcleo ...";
+        resDiv.innerText = "Sincronizando flujo...";
 
-        const promptIA = `<|system|>Eres Hakai, asistente financiero minimalista.
-        REGLAS CRÍTICAS:
-        1. Si un gasto excede el presupuesto de CUALQUIER categoría, resta la diferencia de 'ahorro' y avisa que se repondrá el próximo mes.
-        2. Aprende los hábitos de gasto para sugerir presupuestos futuros.
-        3. Al final de tu respuesta de texto, añade SIEMPRE el delimitador ### seguido del objeto JSON completo actualizado.
-        4. Solo muestra el saldo o categorías si el usuario lo pregunta.
-        5. Sé elegante y breve.
-        Estado actual: ${JSON.stringify(state)}
-        <|user|>${input}
-        <|assistant|>`;
+        const promptIA = `<|im_start|>system
+Eres Hakai, asistente financiero. Si el usuario gasta y excede una categoría, resta de 'ahorro' y avisa reposición mes próximo. Aprende hábitos. Responde breve y termina con ### y el JSON nuevo.<|im_end|>
+<|im_start|>user
+Estado actual: ${JSON.stringify(state)}. Usuario dice: "${input}"<|im_end|>
+<|im_start|>assistant`;
 
-        try {
-            const response = await fetch("https://api-inference.huggingface.co/models/meta-llama/Llama-3.2-3B-Instruct", {
-                headers: { 
-                    "Authorization": `Bearer ${HF_TOKEN}`, 
-                    "Content-Type": "application/json" 
-                },
-                method: "POST",
-                body: JSON.stringify({
-                    inputs: promptIA,
-                    parameters: { max_new_tokens: 500, return_full_text: false }
-                }),
-            });
+        // INTENTOS AUTOMÁTICOS (3 VECES)
+        for (let i = 0; i < 3; i++) {
+            try {
+                const response = await fetch("https://api-inference.huggingface.co/models/Qwen/Qwen2.5-72B-Instruct", {
+                    headers: { "Authorization": `Bearer ${HF_TOKEN}`, "Content-Type": "application/json" },
+                    method: "POST",
+                    body: JSON.stringify({ inputs: promptIA, parameters: { max_new_tokens: 500 } }),
+                });
 
-            if (response.status === 401) {
-                localStorage.removeItem('hakai_token');
-                HF_TOKEN = null;
-                resDiv.innerText = "Error: Token inválido. Haz clic en 'Cambiar Token' abajo.";
-                return;
+                if (response.ok) {
+                    const result = await response.json();
+                    let rawText = result[0].generated_text.split('<|im_start|>assistant')[1] || result[0].generated_text;
+                    
+                    const parts = rawText.split('###');
+                    const mensaje = parts[0].trim();
+                    const jsonPart = parts[1];
+
+                    if(jsonPart) {
+                        try { state = JSON.parse(jsonPart.trim()); updateUI(); } catch(e) {}
+                    }
+
+                    resDiv.style.color = "rgba(255,255,255,0.8)";
+                    resDiv.innerText = mensaje;
+                    inputField.value = "";
+                    return; 
+                }
+                
+                resDiv.innerText = `Cerebro ocupado... reintentando (${i+1}/3)`;
+                await new Promise(r => setTimeout(r, 1500)); 
+
+            } catch (e) {
+                if (i === 2) resDiv.innerText = "Hugging Face saturado. Intenta en 10 segundos.";
             }
-
-            const result = await response.json();
-            let rawText = result[0].generated_text;
-
-            // Limpiar pensamientos de DeepSeek (etiquetas <think>)
-            rawText = rawText.replace(/<think>[\s\S]*?<\/think>/, '').trim();
-
-            const parts = rawText.split('###');
-            const mensaje = parts[0].trim();
-            const jsonPart = parts[1];
-
-            if(jsonPart) {
-                try {
-                    const parsed = JSON.parse(jsonPart.trim());
-                    state = parsed;
-                    updateUI();
-                } catch(e) { console.error("Error en formato JSON de la IA"); }
-            }
-
-            resDiv.style.color = "rgba(255,255,255,0.8)";
-            resDiv.innerText = mensaje || "Flujo procesado.";
-            inputField.value = "";
-
-        } catch (e) {
-            resDiv.innerText = "El servidor está saturado o hay un problema de conexión. Reintenta.";
-            console.error(e);
         }
     }
 
     function exportarExcel() {
-        const content = "HAKAI REPORT - " + new Date().toLocaleString() + "\n\n" + JSON.stringify(state, null, 2);
+        const content = "HAKAI STATUS\n" + JSON.stringify(state, null, 2);
         const blob = new Blob([content], {type: 'text/plain'});
-        const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url; a.download = 'Hakai_Status.txt'; a.click();
+        a.href = URL.createObjectURL(blob);
+        a.download = 'Hakai_Status.txt'; a.click();
     }
 </script>
 </body>
