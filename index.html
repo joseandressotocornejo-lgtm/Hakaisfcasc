@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HAKAI | Turbo</title>
+    <title>HAKAI</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
         * { margin:0; padding:0; box-sizing:border-box; font-family: 'Inter', sans-serif; }
@@ -21,7 +21,7 @@
         .buttons { display:flex; gap:12px; margin-top:30px; }
         button { flex:1; padding:14px; border-radius:16px; border:1px solid rgba(255,255,255,0.05); background: rgba(255,255,255,0.03); color:rgba(255,255,255,0.6); cursor:pointer; transition:0.3s; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
         .confirm { background: linear-gradient(45deg,#9d00ff,#ff00cc); border:none; color:white; }
-        .token-hint { position: absolute; bottom: 10px; font-size: 9px; color: rgba(255,255,255,0.1); cursor: pointer; }
+        .token-hint { position: absolute; bottom: 10px; font-size: 9px; color: rgba(255,255,255,0.1); cursor: pointer; text-decoration: none; }
     </style>
 </head>
 <body>
@@ -33,31 +33,30 @@
     <div class="title">Hakai</div>
     <div class="divider"></div>
     <div class="input-area">
-        <input type="text" id="user-input" placeholder="Dime qué ocurrió hoy..." onkeypress="if(event.key==='Enter') processData()">
+        <input type="text" id="user-input" placeholder="Comando de flujo..." onkeypress="if(event.key==='Enter') processData()">
     </div>
-    <div id="response">Hakai Turbo en línea. Lista para el flujo.</div>
+    <div id="response">Sistema listo.</div>
     <div class="buttons">
         <button class="confirm" onclick="processData()">Sincronizar</button>
         <button onclick="exportarExcel()">Reporte</button>
     </div>
-    <a class="token-hint" onclick="resetToken()">Cambiar API Key de Groq</a>
+    <a class="token-hint" onclick="resetToken()">Cambiar API Key</a>
 </div>
 
 <script>
     let GROQ_KEY = localStorage.getItem('hakai_groq_key'); 
-    let state = JSON.parse(localStorage.getItem('hakai_v9')) || {
-        total: 0,
+    let state = JSON.parse(localStorage.getItem('hakai_v11')) || {
         categorias: { arriendo: 0, mercaderia: 0, transporte: 0, salud: 0, ahorro: 0, personal: 0 },
-        logs: []
+        presupuestos_iniciales: {}
     };
 
     function updateUI() {
-        localStorage.setItem('hakai_v9', JSON.stringify(state));
+        localStorage.setItem('hakai_v11', JSON.stringify(state));
         if(GROQ_KEY) localStorage.setItem('hakai_groq_key', GROQ_KEY);
     }
 
     function resetToken() {
-        const nuevo = prompt("Introduce tu API Key de Groq (gsk_...):");
+        const nuevo = prompt("API Key de Groq (gsk_...):");
         if(nuevo) { GROQ_KEY = nuevo; updateUI(); location.reload(); }
     }
 
@@ -67,25 +66,25 @@
         const resDiv = document.getElementById('response');
 
         if (!GROQ_KEY) {
-            GROQ_KEY = prompt("Pega tu API Key de Groq (gsk_...):");
+            GROQ_KEY = prompt("API Key de Groq:");
             if (GROQ_KEY) updateUI(); else return;
         }
 
         if (!input) return;
-        resDiv.innerText = "Hakai procesando instantáneamente...";
+        resDiv.innerText = "...";
 
-        const promptSystem = `Eres Hakai, asistente financiero minimalista.
+        const promptSystem = `Eres Hakai, sistema financiero minimalista.
         REGLAS:
-        1. Si un gasto excede presupuesto, resta de 'ahorro' y avisa reposición.
-        2. Al final de tu texto añade ### seguido del JSON actualizado.
+        1. Responde con menos de 10 palabras. Sin saludos ni consejos. Solo confirma datos.
+        2. Si el usuario define presupuestos por categoría, cualquier excedente del monto total se asigna automáticamente a 'ahorro'.
+        3. Si un gasto excede el presupuesto de una categoría, descuenta de 'ahorro' y avisa: "Descontado de ahorro. Reponer próximo mes".
+        4. Aprende hábitos de gasto para sugerencias futuras.
+        5. Siempre devuelve el JSON actualizado tras el delimitador ###.
         Estado actual: ${JSON.stringify(state)}`;
 
         try {
             const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-                headers: { 
-                    "Authorization": `Bearer ${GROQ_KEY}`, 
-                    "Content-Type": "application/json" 
-                },
+                headers: { "Authorization": `Bearer ${GROQ_KEY}`, "Content-Type": "application/json" },
                 method: "POST",
                 body: JSON.stringify({ 
                     model: "llama-3.3-70b-versatile",
@@ -93,14 +92,14 @@
                         { role: "system", content: promptSystem },
                         { role: "user", content: input }
                     ],
-                    temperature: 0.1
+                    temperature: 0
                 }),
             });
 
             const data = await response.json();
             const rawText = data.choices[0].message.content;
-            
             const parts = rawText.split('###');
+
             if(parts[1]) {
                 state = JSON.parse(parts[1].trim());
                 updateUI();
@@ -110,7 +109,7 @@
             inputField.value = "";
 
         } catch (e) {
-            resDiv.innerText = "Error en la conexión con Groq. Revisa tu llave.";
+            resDiv.innerText = "Error de sincronización.";
         }
     }
 
