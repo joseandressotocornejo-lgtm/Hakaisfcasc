@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HAKAI | Flujo Compartido</title>
+    <title>| HAKAI |</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
         * { margin:0; padding:0; box-sizing:border-box; font-family: 'Inter', sans-serif; }
@@ -14,13 +14,11 @@
         .lightning path { stroke:#ff00cc; stroke-width:6; fill:none; filter: drop-shadow(0 0 12px #ff00cc); }
         .title { font-size:38px; font-weight:300; color:white; letter-spacing: 6px; text-transform: uppercase; margin-left: 60px; margin-bottom: 10px; }
         .divider { height:1px; background: linear-gradient(to right, transparent, rgba(255,255,255,0.1), transparent); margin:25px 0; }
-        input { width: 100%; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); padding: 18px; border-radius: 18px; color: white; outline: none; transition: 0.4s; font-size: 14px; font-weight: 300; }
-        input:focus { border-color: #ff00cc; background: rgba(255,0,200,0.04); }
-        #response { margin-top: 25px; font-size: 13px; color: rgba(255,255,255,0.8); line-height: 1.5; min-height: 50px; font-weight: 300; white-space: pre-wrap; max-height: 350px; overflow-y: auto; padding-right: 10px; }
+        input { width: 100%; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); padding: 18px; border-radius: 18px; color: white; outline: none; transition: 0.4s; font-size: 14px; }
+        #response { margin-top: 25px; font-size: 13px; color: rgba(255,255,255,0.8); line-height: 1.5; min-height: 50px; white-space: pre-wrap; max-height: 350px; overflow-y: auto; }
+        .user-tag { position: absolute; top: 20px; right: 40px; font-size: 10px; color: #ff00cc; letter-spacing: 2px; }
         #response::-webkit-scrollbar { width: 4px; }
         #response::-webkit-scrollbar-thumb { background: rgba(255,0,204,0.3); border-radius: 10px; }
-        .user-tag { position: absolute; top: 20px; right: 40px; font-size: 10px; color: #ff00cc; text-transform: uppercase; letter-spacing: 2px; }
-        .token-hint { position: absolute; bottom: 15px; left: 40px; font-size: 8px; color: rgba(255,255,255,0.1); cursor: pointer; text-decoration: none; }
     </style>
 </head>
 <body>
@@ -32,35 +30,42 @@
     </svg>
     <div class="title">Hakai</div>
     <div class="divider"></div>
-    <input type="text" id="user-input" placeholder="Comando o 'detalle completo'..." onkeypress="if(event.key==='Enter') processData()">
-    <div id="response">Esperando flujo...</div>
-    <a class="token-hint" onclick="resetConfig()">Reset Config</a>
+    <input type="text" id="user-input" placeholder="Sincronizando..." onkeypress="if(event.key==='Enter') processData()">
+    <div id="response">Conectando a la nube...</div>
 </div>
 
 <script>
-    let GROQ_KEY = localStorage.getItem('hakai_groq_key');
-    let USER_NAME = localStorage.getItem('hakai_user_name');
+    // Credenciales fijas
+    const GH_TOKEN = "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";
+    const GIST_ID = "c87bb48fa76fb15b48ed50d59619b2a4";
+    let GROQ_KEY = localStorage.getItem('h_groq');
+    let USER_NAME = localStorage.getItem('h_user');
     
-    let state = JSON.parse(localStorage.getItem('hakai_v15')) || {
-        categorias: { arriendo: 0, mercaderia: 0, transporte: 0, salud: 0, ahorro: 0, personal: 0 },
-        presupuestos_base: { arriendo: 0, mercaderia: 0, transporte: 0, salud: 0, personal: 0 },
-        historial: [] 
-    };
+    let state = { categorias: {}, presupuestos_base: {}, historial: [] };
+
+    // Cargar datos del Gist
+    async function loadCloud() {
+        try {
+            const res = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                headers: { "Authorization": `token ${GH_TOKEN}` }
+            });
+            const data = await res.json();
+            const content = data.files["hakai.json"].content;
+            state = content === "{}" ? { categorias: {arriendo:0, mercaderia:0, transporte:0, salud:0, ahorro:0, personal:0}, presupuestos_base: {}, historial: [] } : JSON.parse(content);
+            document.getElementById('response').innerText = "Hakai en línea.";
+            document.getElementById('user-input').placeholder = "Escribe un comando...";
+        } catch (e) { 
+            document.getElementById('response').innerText = "Error al conectar con GitHub."; 
+        }
+    }
 
     if (!USER_NAME) {
-        USER_NAME = prompt("¿Quién eres? (Tu nombre para el historial)");
-        if (USER_NAME) localStorage.setItem('hakai_user_name', USER_NAME);
+        USER_NAME = prompt("¿Quién eres?");
+        if (USER_NAME) localStorage.setItem('h_user', USER_NAME);
     }
-    document.getElementById('user-display').innerText = USER_NAME || "";
-
-    function updateUI() {
-        localStorage.setItem('hakai_v15', JSON.stringify(state));
-    }
-
-    function resetConfig() {
-        localStorage.clear();
-        location.reload();
-    }
+    document.getElementById('user-display').innerText = USER_NAME || "USER";
+    
+    loadCloud();
 
     async function processData() {
         const inputField = document.getElementById('user-input');
@@ -68,8 +73,8 @@
         const resDiv = document.getElementById('response');
 
         if (!GROQ_KEY) {
-            GROQ_KEY = prompt("API Key de Groq:");
-            if (GROQ_KEY) localStorage.setItem('hakai_groq_key', GROQ_KEY);
+            GROQ_KEY = prompt("Introduce tu API Key de Groq:");
+            if (GROQ_KEY) localStorage.setItem('h_groq', GROQ_KEY);
             else return;
         }
 
@@ -78,13 +83,13 @@
         
         const ahora = new Date().toLocaleString('es-CL', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
 
-        const promptSystem = `Eres Hakai, IA de finanzas compartidas para ${USER_NAME} y su pareja.
+        const promptSystem = `Eres Hakai, IA compartida para ${USER_NAME}.
         REGLAS:
-        1. DETALLE COMPLETO: Lista saldos y luego el historial de movimientos de forma ordenada.
-        2. NORMAL: Menos de 10 palabras. NO JSON.
-        3. HISTORIAL: Registra cada acción en 'historial' como: "DD/MM HH:MM | Acción | Monto | por ${USER_NAME}".
-        4. LÓGICA: Sobras a ahorro. Sobre-gasto resta de ahorro y avisa reposición.
-        Estructura: Mensaje ### JSON
+        1. DETALLE: Si piden "detalle completo" o "estado", lista saldos e historial de movimientos.
+        2. NORMAL: Menos de 10 palabras. Responde solo lo que se pregunta.
+        3. HISTORIAL: Registra cada gasto/aporte en 'historial': "DD/MM HH:MM | Acción | Monto | por ${USER_NAME}".
+        4. LÓGICA: Presupuestos sobran -> Ahorro. Gasto extra -> Resta de ahorro y avisa reposición.
+        5. IMPORTANTE: JSON al final tras ###.
         Estado actual: ${JSON.stringify(state)}`;
 
         try {
@@ -104,16 +109,22 @@
             if (rawText.includes('###')) {
                 const [mensaje, jsonPart] = rawText.split('###');
                 state = JSON.parse(jsonPart.trim().replace(/^[^{]*/, '').replace(/[^}]*$/, ''));
-                updateUI();
+                
+                // Guardar en GitHub Gist
+                await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                    method: 'PATCH',
+                    headers: { "Authorization": `token ${GH_TOKEN}` },
+                    body: JSON.stringify({ files: { "hakai.json": { content: JSON.stringify(state) } } })
+                });
+
                 resDiv.innerText = mensaje.trim();
             } else {
                 resDiv.innerText = rawText.trim();
             }
             inputField.value = "";
             resDiv.scrollTop = 0;
-
         } catch (e) {
-            resDiv.innerText = "Error de conexión.";
+            resDiv.innerText = "Error de red o API Key inválida.";
         }
     }
 </script>
