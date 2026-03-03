@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>| HAKAI |</title>
+    <title>HAKAI</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
         * { margin:0; padding:0; box-sizing:border-box; font-family: 'Inter', sans-serif; }
@@ -17,7 +17,7 @@
         .input-area { margin-top: 20px; position: relative; }
         input { width: 100%; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); padding: 18px; border-radius: 18px; color: white; outline: none; transition: 0.4s; font-size: 14px; font-weight: 300; }
         input:focus { border-color: #ff00cc; background: rgba(255,0,200,0.04); }
-        #response { margin-top: 20px; font-size: 14px; color: rgba(255,255,255,0.8); line-height: 1.6; min-height: 40px; font-weight: 300; }
+        #response { margin-top: 20px; font-size: 14px; color: rgba(255,255,255,0.8); line-height: 1.6; min-height: 40px; font-weight: 300; white-space: pre-line; }
         .buttons { display:flex; gap:12px; margin-top:30px; }
         button { flex:1; padding:14px; border-radius:16px; border:1px solid rgba(255,255,255,0.05); background: rgba(255,255,255,0.03); color:rgba(255,255,255,0.6); cursor:pointer; transition:0.3s; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
         .confirm { background: linear-gradient(45deg,#9d00ff,#ff00cc); border:none; color:white; }
@@ -33,7 +33,7 @@
     <div class="title">Hakai</div>
     <div class="divider"></div>
     <div class="input-area">
-        <input type="text" id="user-input" placeholder="Comando de flujo..." onkeypress="if(event.key==='Enter') processData()">
+        <input type="text" id="user-input" placeholder="Comando o 'detalle'..." onkeypress="if(event.key==='Enter') processData()">
     </div>
     <div id="response">Sistema listo.</div>
     <div class="buttons">
@@ -45,14 +45,14 @@
 
 <script>
     let GROQ_KEY = localStorage.getItem('hakai_groq_key'); 
-    let state = JSON.parse(localStorage.getItem('hakai_v12')) || {
+    let state = JSON.parse(localStorage.getItem('hakai_v13')) || {
         categorias: { arriendo: 0, mercaderia: 0, transporte: 0, salud: 0, ahorro: 0, personal: 0 },
         presupuestos_base: { arriendo: 0, mercaderia: 0, transporte: 0, salud: 0, personal: 0 },
         ultimo_reinicio: null
     };
 
     function updateUI() {
-        localStorage.setItem('hakai_v12', JSON.stringify(state));
+        localStorage.setItem('hakai_v13', JSON.stringify(state));
         if(GROQ_KEY) localStorage.setItem('hakai_groq_key', GROQ_KEY);
     }
 
@@ -74,23 +74,19 @@
         if (!input) return;
         resDiv.innerText = "...";
 
-        // Lógica de detección de primer día del mes
         const hoy = new Date();
         const mesActual = hoy.getMonth() + "-" + hoy.getFullYear();
-        let modoReinicio = false;
-        if (hoy.getDate() === 1 && state.ultimo_reinicio !== mesActual) {
-            modoReinicio = true;
-            state.ultimo_reinicio = mesActual;
-        }
+        let modoReinicio = (hoy.getDate() === 1 && state.ultimo_reinicio !== mesActual);
 
         const promptSystem = `Eres Hakai, sistema financiero minimalista.
         REGLAS:
-        1. Responde con menos de 10 palabras. NO muestres el objeto JSON al usuario.
-        2. Si el usuario define presupuestos (ej. "salud 50k"), actualiza 'presupuestos_base' y 'categorias'. No lo restes de ahorro.
-        3. EXCEDENTES: Cualquier dinero sobrante del presupuesto total va a 'ahorro'.
-        4. SOBREGASTO: Si gasta de más, resta de 'ahorro' y avisa reposición brevemente.
-        5. REINICIO MENSUAL (Modo: ${modoReinicio}): Si es TRUE, suma lo que sobró en cada categoría a 'ahorro', luego restaura las categorías según 'presupuestos_base'. Notifica cuánto se ahorró.
-        6. Devuelve: Mensaje ### JSON.
+        1. EXCEPCIÓN DE DETALLE: Si el usuario pide "detalle", "estado" o "cuánto queda", muestra una lista vertical de todas las categorías y sus saldos. Aquí puedes usar las palabras necesarias.
+        2. RESPUESTA NORMAL: Menos de 10 palabras. NO muestres el JSON.
+        3. ASIGNACIÓN: Definir presupuestos actualiza 'presupuestos_base' y 'categorias' sin tocar ahorro.
+        4. EXCEDENTES: Cualquier sobrante del total va a 'ahorro'.
+        5. SOBREGASTO: Resta de 'ahorro' y avisa reposición.
+        6. REINICIO (Día 1): Si modoReinicio es true, mueve saldos a ahorro y restaura base.
+        7. Devuelve: Mensaje ### JSON.
         Estado actual: ${JSON.stringify(state)}`;
 
         try {
@@ -110,10 +106,11 @@
 
             if(parts[1]) {
                 state = JSON.parse(parts[1].trim());
+                if (modoReinicio) state.ultimo_reinicio = mesActual;
                 updateUI();
             }
 
-            resDiv.innerText = parts[0].trim(); // Solo muestra el mensaje, no el JSON
+            resDiv.innerText = parts[0].trim();
             inputField.value = "";
 
         } catch (e) {
