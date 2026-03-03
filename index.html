@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HAKAI</title>
+    <title>| HAKAI |</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
         * { margin:0; padding:0; box-sizing:border-box; font-family: 'Inter', sans-serif; }
@@ -17,7 +17,7 @@
         .input-area { margin-top: 20px; position: relative; }
         input { width: 100%; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); padding: 18px; border-radius: 18px; color: white; outline: none; transition: 0.4s; font-size: 14px; font-weight: 300; }
         input:focus { border-color: #ff00cc; background: rgba(255,0,200,0.04); }
-        #response { margin-top: 20px; font-size: 14px; color: rgba(255,255,255,0.8); line-height: 1.6; min-height: 40px; font-weight: 300; white-space: pre-line; }
+        #response { margin-top: 20px; font-size: 14px; color: rgba(255,255,255,0.8); line-height: 1.6; min-height: 40px; font-weight: 300; white-space: pre-wrap; max-height: 200px; overflow-y: auto; }
         .buttons { display:flex; gap:12px; margin-top:30px; }
         button { flex:1; padding:14px; border-radius:16px; border:1px solid rgba(255,255,255,0.05); background: rgba(255,255,255,0.03); color:rgba(255,255,255,0.6); cursor:pointer; transition:0.3s; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
         .confirm { background: linear-gradient(45deg,#9d00ff,#ff00cc); border:none; color:white; }
@@ -35,7 +35,7 @@
     <div class="input-area">
         <input type="text" id="user-input" placeholder="Comando o 'detalle'..." onkeypress="if(event.key==='Enter') processData()">
     </div>
-    <div id="response">Sistema listo.</div>
+    <div id="response">Hakai lista.</div>
     <div class="buttons">
         <button class="confirm" onclick="processData()">Sincronizar</button>
         <button onclick="exportarExcel()">Reporte</button>
@@ -45,19 +45,19 @@
 
 <script>
     let GROQ_KEY = localStorage.getItem('hakai_groq_key'); 
-    let state = JSON.parse(localStorage.getItem('hakai_v13')) || {
+    let state = JSON.parse(localStorage.getItem('hakai_v14')) || {
         categorias: { arriendo: 0, mercaderia: 0, transporte: 0, salud: 0, ahorro: 0, personal: 0 },
         presupuestos_base: { arriendo: 0, mercaderia: 0, transporte: 0, salud: 0, personal: 0 },
         ultimo_reinicio: null
     };
 
     function updateUI() {
-        localStorage.setItem('hakai_v13', JSON.stringify(state));
+        localStorage.setItem('hakai_v14', JSON.stringify(state));
         if(GROQ_KEY) localStorage.setItem('hakai_groq_key', GROQ_KEY);
     }
 
     function resetToken() {
-        const nuevo = prompt("API Key de Groq (gsk_...):");
+        const nuevo = prompt("API Key de Groq:");
         if(nuevo) { GROQ_KEY = nuevo; updateUI(); location.reload(); }
     }
 
@@ -72,21 +72,21 @@
         }
 
         if (!input) return;
-        resDiv.innerText = "...";
+        resDiv.innerText = "Procesando...";
 
         const hoy = new Date();
-        const mesActual = hoy.getMonth() + "-" + hoy.getFullYear();
+        const mesActual = (hoy.getMonth() + 1) + "-" + hoy.getFullYear();
         let modoReinicio = (hoy.getDate() === 1 && state.ultimo_reinicio !== mesActual);
 
         const promptSystem = `Eres Hakai, sistema financiero minimalista.
         REGLAS:
-        1. EXCEPCIÓN DE DETALLE: Si el usuario pide "detalle", "estado" o "cuánto queda", muestra una lista vertical de todas las categorías y sus saldos. Aquí puedes usar las palabras necesarias.
-        2. RESPUESTA NORMAL: Menos de 10 palabras. NO muestres el JSON.
-        3. ASIGNACIÓN: Definir presupuestos actualiza 'presupuestos_base' y 'categorias' sin tocar ahorro.
-        4. EXCEDENTES: Cualquier sobrante del total va a 'ahorro'.
-        5. SOBREGASTO: Resta de 'ahorro' y avisa reposición.
-        6. REINICIO (Día 1): Si modoReinicio es true, mueve saldos a ahorro y restaura base.
-        7. Devuelve: Mensaje ### JSON.
+        1. Si el usuario pide "detalle", "estado" o "saldos", lista cada categoría con su valor actual.
+        2. En peticiones normales: menos de 10 palabras.
+        3. No muestres el JSON al usuario.
+        4. Si el usuario define un presupuesto total y asigna partes, el sobrante va a 'ahorro'.
+        5. Sobre-gasto: resta de 'ahorro' y avisa reposición breve.
+        6. Reinicio Mensual (Modo: ${modoReinicio}): Suma excedentes a ahorro y restaura presupuestos base.
+        Estructura de respuesta: [Mensaje de texto] ### [JSON actualizado]
         Estado actual: ${JSON.stringify(state)}`;
 
         try {
@@ -102,19 +102,26 @@
 
             const data = await response.json();
             const rawText = data.choices[0].message.content;
-            const parts = rawText.split('###');
-
-            if(parts[1]) {
-                state = JSON.parse(parts[1].trim());
-                if (modoReinicio) state.ultimo_reinicio = mesActual;
-                updateUI();
+            
+            if (rawText.includes('###')) {
+                const [mensaje, jsonPart] = rawText.split('###');
+                try {
+                    const cleanJson = jsonPart.trim().replace(/^[^{]*/, '').replace(/[^}]*$/, '');
+                    state = JSON.parse(cleanJson);
+                    if (modoReinicio) state.ultimo_reinicio = mesActual;
+                    updateUI();
+                    resDiv.innerText = mensaje.trim();
+                } catch(e) {
+                    resDiv.innerText = "Hakai: Error en lectura de datos.";
+                    console.log("JSON Error:", jsonPart);
+                }
+            } else {
+                resDiv.innerText = rawText.trim();
             }
-
-            resDiv.innerText = parts[0].trim();
             inputField.value = "";
 
         } catch (e) {
-            resDiv.innerText = "Error de sincronización.";
+            resDiv.innerText = "Error de conexión con el núcleo.";
         }
     }
 
