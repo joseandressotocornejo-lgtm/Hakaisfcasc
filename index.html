@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HAKAI</title>
+    <title>| HAKAI |</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
         * { margin:0; padding:0; box-sizing:border-box; font-family: 'Inter', sans-serif; }
@@ -45,13 +45,14 @@
 
 <script>
     let GROQ_KEY = localStorage.getItem('hakai_groq_key'); 
-    let state = JSON.parse(localStorage.getItem('hakai_v11')) || {
+    let state = JSON.parse(localStorage.getItem('hakai_v12')) || {
         categorias: { arriendo: 0, mercaderia: 0, transporte: 0, salud: 0, ahorro: 0, personal: 0 },
-        presupuestos_iniciales: {}
+        presupuestos_base: { arriendo: 0, mercaderia: 0, transporte: 0, salud: 0, personal: 0 },
+        ultimo_reinicio: null
     };
 
     function updateUI() {
-        localStorage.setItem('hakai_v11', JSON.stringify(state));
+        localStorage.setItem('hakai_v12', JSON.stringify(state));
         if(GROQ_KEY) localStorage.setItem('hakai_groq_key', GROQ_KEY);
     }
 
@@ -73,13 +74,23 @@
         if (!input) return;
         resDiv.innerText = "...";
 
+        // Lógica de detección de primer día del mes
+        const hoy = new Date();
+        const mesActual = hoy.getMonth() + "-" + hoy.getFullYear();
+        let modoReinicio = false;
+        if (hoy.getDate() === 1 && state.ultimo_reinicio !== mesActual) {
+            modoReinicio = true;
+            state.ultimo_reinicio = mesActual;
+        }
+
         const promptSystem = `Eres Hakai, sistema financiero minimalista.
         REGLAS:
-        1. Responde con menos de 10 palabras. Sin saludos ni consejos. Solo confirma datos.
-        2. Si el usuario define presupuestos por categoría, cualquier excedente del monto total se asigna automáticamente a 'ahorro'.
-        3. Si un gasto excede el presupuesto de una categoría, descuenta de 'ahorro' y avisa: "Descontado de ahorro. Reponer próximo mes".
-        4. Aprende hábitos de gasto para sugerencias futuras.
-        5. Siempre devuelve el JSON actualizado tras el delimitador ###.
+        1. Responde con menos de 10 palabras. NO muestres el objeto JSON al usuario.
+        2. Si el usuario define presupuestos (ej. "salud 50k"), actualiza 'presupuestos_base' y 'categorias'. No lo restes de ahorro.
+        3. EXCEDENTES: Cualquier dinero sobrante del presupuesto total va a 'ahorro'.
+        4. SOBREGASTO: Si gasta de más, resta de 'ahorro' y avisa reposición brevemente.
+        5. REINICIO MENSUAL (Modo: ${modoReinicio}): Si es TRUE, suma lo que sobró en cada categoría a 'ahorro', luego restaura las categorías según 'presupuestos_base'. Notifica cuánto se ahorró.
+        6. Devuelve: Mensaje ### JSON.
         Estado actual: ${JSON.stringify(state)}`;
 
         try {
@@ -88,10 +99,7 @@
                 method: "POST",
                 body: JSON.stringify({ 
                     model: "llama-3.3-70b-versatile",
-                    messages: [
-                        { role: "system", content: promptSystem },
-                        { role: "user", content: input }
-                    ],
+                    messages: [{ role: "system", content: promptSystem }, { role: "user", content: input }],
                     temperature: 0
                 }),
             });
@@ -105,7 +113,7 @@
                 updateUI();
             }
 
-            resDiv.innerText = parts[0].trim();
+            resDiv.innerText = parts[0].trim(); // Solo muestra el mensaje, no el JSON
             inputField.value = "";
 
         } catch (e) {
