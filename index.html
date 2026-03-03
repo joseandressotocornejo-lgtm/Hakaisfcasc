@@ -3,11 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hakai</title>
+    <title>HAKAI | Sistema de Flujo</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
+        /* ESTÉTICA HAKAI REFINADA */
         * { margin:0; padding:0; box-sizing:border-box; font-family: 'Inter', sans-serif; }
-        body { height:100vh; display:flex; flex-direction:column; justify-content:center; align-items:center; background:#070012; overflow:hidden; }
+        body { 
+            height:100vh; display:flex; flex-direction:column; justify-content:center; 
+            align-items:center; background:#070012; overflow:hidden; 
+        }
 
         body::before {
             content:""; position:absolute; width:600px; height:600px;
@@ -28,8 +32,7 @@
         .title { 
             font-size:38px; font-weight:300; color:white; 
             letter-spacing: 6px; text-transform: uppercase;
-            margin-left: 60px; 
-            margin-bottom: 10px;
+            margin-left: 60px; margin-bottom: 10px;
         }
 
         .divider { height:1px; background: linear-gradient(to right, transparent, rgba(255,255,255,0.1), transparent); margin:25px 0; }
@@ -52,6 +55,7 @@
             flex:1; padding:14px; border-radius:16px; border:1px solid rgba(255,255,255,0.05); 
             background: rgba(255,255,255,0.03); color:rgba(255,255,255,0.6); 
             cursor:pointer; transition:0.3s; font-size: 11px; letter-spacing: 1px;
+            text-transform: uppercase;
         }
         button:hover { background: rgba(255,255,255,0.07); color:white; }
         
@@ -61,6 +65,10 @@
         }
         .confirm:hover { box-shadow:0 15px 30px rgba(255,0,200,0.4); transform:translateY(-2px); }
         
+        .token-hint {
+            position: absolute; bottom: 10px; font-size: 9px; color: rgba(255,255,255,0.1);
+            cursor: pointer; text-decoration: none;
+        }
     </style>
 </head>
 <body>
@@ -84,40 +92,61 @@
         <button class="confirm" onclick="processData()">Sincronizar</button>
         <button onclick="exportarExcel()">Reporte</button>
     </div>
+
+    <a class="token-hint" onclick="resetToken()">Cambiar Token</a>
 </div>
 
 <script>
-    const HF_TOKEN = "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"; 
-
-    let state = JSON.parse(localStorage.getItem('hakai_v5')) || {
+    // CARGAR DATOS
+    let HF_TOKEN = localStorage.getItem('hakai_token'); 
+    let state = JSON.parse(localStorage.getItem('hakai_v6')) || {
         total: 0,
         categorias: { arriendo: 0, mercaderia: 0, transporte: 0, salud: 0, ahorro: 0, personal: 0 },
         logs: []
     };
 
     function updateUI() {
-        localStorage.setItem('hakai_v5', JSON.stringify(state));
+        localStorage.setItem('hakai_v6', JSON.stringify(state));
+        if(HF_TOKEN) localStorage.setItem('hakai_token', HF_TOKEN);
     }
 
     function handleKeyPress(e) {
         if (e.key === 'Enter') processData();
     }
 
+    function resetToken() {
+        const nuevo = prompt("Introduce tu nuevo Token de Hugging Face:");
+        if(nuevo) {
+            HF_TOKEN = nuevo;
+            updateUI();
+            alert("Token actualizado.");
+        }
+    }
+
     async function processData() {
         const inputField = document.getElementById('user-input');
         const input = inputField.value;
         const resDiv = document.getElementById('response');
+
+        // Pedir token si no existe
+        if (!HF_TOKEN || HF_TOKEN === "null" || HF_TOKEN.length < 5) {
+            HF_TOKEN = prompt("Hakai requiere tu Token de Hugging Face (Gratis):");
+            if (HF_TOKEN) updateUI();
+            else return;
+        }
+
         if (!input) return;
 
         resDiv.style.color = "#ff4df3";
-        resDiv.innerText = "Hakai sincronizando con DeepSeek...";
+        resDiv.innerText = "Sincronizando con el núcleo DeepSeek...";
 
-        const prompt = `<|system|>Eres Hakai, asistente financiero minimalista.
-        REGLAS:
-        1. Si el usuario gasta en cualquier categoría y excede el presupuesto, resta la diferencia de 'ahorro' y avisa que se repondrá el mes próximo.
-        2. Si el usuario define presupuestos, actualiza el estado.
+        const promptIA = `<|system|>Eres Hakai, asistente financiero minimalista.
+        REGLAS CRÍTICAS:
+        1. Si un gasto excede el presupuesto de CUALQUIER categoría, resta la diferencia de 'ahorro' y avisa que se repondrá el próximo mes.
+        2. Aprende los hábitos de gasto para sugerir presupuestos futuros.
         3. Al final de tu respuesta de texto, añade SIEMPRE el delimitador ### seguido del objeto JSON completo actualizado.
-        4. Sé breve y elegante.
+        4. Solo muestra el saldo o categorías si el usuario lo pregunta.
+        5. Sé elegante y breve.
         Estado actual: ${JSON.stringify(state)}
         <|user|>${input}
         <|assistant|>`;
@@ -130,42 +159,52 @@
                 },
                 method: "POST",
                 body: JSON.stringify({
-                    inputs: prompt,
+                    inputs: promptIA,
                     parameters: { max_new_tokens: 500, return_full_text: false }
                 }),
             });
 
-            const result = await response.json();
-            const rawText = result[0].generated_text;
+            if (response.status === 401) {
+                localStorage.removeItem('hakai_token');
+                HF_TOKEN = null;
+                resDiv.innerText = "Error: Token inválido. Haz clic en 'Cambiar Token' abajo.";
+                return;
+            }
 
-            // Separar mensaje de JSON
+            const result = await response.json();
+            let rawText = result[0].generated_text;
+
+            // Limpiar pensamientos de DeepSeek (etiquetas <think>)
+            rawText = rawText.replace(/<think>[\s\S]*?<\/think>/, '').trim();
+
             const parts = rawText.split('###');
             const mensaje = parts[0].trim();
             const jsonPart = parts[1];
 
             if(jsonPart) {
                 try {
-                    state = JSON.parse(jsonPart.trim());
+                    const parsed = JSON.parse(jsonPart.trim());
+                    state = parsed;
                     updateUI();
-                } catch(e) { console.error("Error parseando JSON de la IA"); }
+                } catch(e) { console.error("Error en formato JSON de la IA"); }
             }
 
             resDiv.style.color = "rgba(255,255,255,0.8)";
-            resDiv.innerText = mensaje.replace(/<think>[\s\S]*?<\/think>/, '').trim(); // Limpia pensamientos de DeepSeek
+            resDiv.innerText = mensaje || "Flujo procesado.";
             inputField.value = "";
 
         } catch (e) {
-            resDiv.innerText = "Error: El núcleo está saturado o el Token es inválido.";
+            resDiv.innerText = "El servidor está saturado o hay un problema de conexión. Reintenta.";
             console.error(e);
         }
     }
 
     function exportarExcel() {
-        const content = "Fecha,Estado Final\n" + new Date().toLocaleDateString() + "," + JSON.stringify(state);
-        const blob = new Blob([content], {type: 'text/csv'});
+        const content = "HAKAI REPORT - " + new Date().toLocaleString() + "\n\n" + JSON.stringify(state, null, 2);
+        const blob = new Blob([content], {type: 'text/plain'});
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url; a.download = 'Hakai_Reporte.csv'; a.click();
+        a.href = url; a.download = 'Hakai_Status.txt'; a.click();
     }
 </script>
 </body>
