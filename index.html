@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HAKAI | Cloud Safe</title>
+    <title>HAKAI | Voice Cloud</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
         * { margin:0; padding:0; box-sizing:border-box; font-family: 'Inter', sans-serif; }
@@ -14,12 +14,12 @@
         .lightning path { stroke:#ff00cc; stroke-width:6; fill:none; filter: drop-shadow(0 0 12px #ff00cc); }
         .title { font-size:38px; font-weight:300; color:white; letter-spacing: 6px; text-transform: uppercase; margin-left: 60px; margin-bottom: 10px; }
         .divider { height:1px; background: linear-gradient(to right, transparent, rgba(255,255,255,0.1), transparent); margin:25px 0; }
-        input { width: 100%; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); padding: 18px; border-radius: 18px; color: white; outline: none; transition: 0.4s; font-size: 14px; }
-        #response { margin-top: 25px; font-size: 13px; color: rgba(255,255,255,0.8); line-height: 1.5; min-height: 50px; white-space: pre-wrap; max-height: 350px; overflow-y: auto; padding-right: 5px; }
-        #response::-webkit-scrollbar { width: 4px; }
-        #response::-webkit-scrollbar-thumb { background: rgba(255,0,204,0.3); border-radius: 10px; }
+        .input-group { position: relative; display: flex; align-items: center; }
+        input { width: 100%; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); padding: 18px 50px 18px 18px; border-radius: 18px; color: white; outline: none; transition: 0.4s; font-size: 14px; }
+        .mic-btn { position: absolute; right: 15px; cursor: pointer; color: #ff00cc; font-size: 20px; transition: 0.3s; background: none; border: none; }
+        .mic-btn.active { filter: drop-shadow(0 0 8px #ff00cc); transform: scale(1.2); }
+        #response { margin-top: 25px; font-size: 13px; color: rgba(255,255,255,0.8); line-height: 1.5; min-height: 50px; white-space: pre-wrap; max-height: 300px; overflow-y: auto; }
         .user-tag { position: absolute; top: 20px; right: 40px; font-size: 10px; color: #ff00cc; letter-spacing: 2px; }
-        .reset-btn { position: absolute; bottom: 15px; left: 40px; font-size: 8px; color: rgba(255,255,255,0.1); cursor: pointer; text-decoration: none; }
     </style>
 </head>
 <body>
@@ -31,18 +31,40 @@
     </svg>
     <div class="title">Hakai</div>
     <div class="divider"></div>
-    <input type="text" id="user-input" placeholder="Configurando..." onkeypress="if(event.key==='Enter') processData()">
-    <div id="response">Cargando sistema...</div>
-    <a class="reset-btn" onclick="resetConfig()">RESET CONFIG</a>
+    <div class="input-group">
+        <input type="text" id="user-input" placeholder="Dicta o escribe..." onkeypress="if(event.key==='Enter') processData()">
+        <button class="mic-btn" id="mic-toggle" onclick="toggleMic()">🎤</button>
+    </div>
+    <div id="response">Hakai lista para escuchar.</div>
 </div>
 
 <script>
+    // Configuración de Voz
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition;
+    if (SpeechRecognition) {
+        recognition = new SpeechRecognition();
+        recognition.lang = 'es-CL';
+        recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            document.getElementById('user-input').value = transcript;
+            processData(); // Envía automáticamente al terminar de hablar
+        };
+        recognition.onend = () => document.getElementById('mic-toggle').classList.remove('active');
+    }
+
+    function toggleMic() {
+        if (!recognition) return alert("Voz no soportada en este navegador.");
+        document.getElementById('mic-toggle').classList.add('active');
+        recognition.start();
+    }
+
+    // Lógica de Datos (Copia de la versión estable anterior)
     let GH_TOKEN = localStorage.getItem('h_gh_token');
     let GIST_ID = localStorage.getItem('h_gist_id');
     let GROQ_KEY = localStorage.getItem('h_groq');
     let USER_NAME = localStorage.getItem('h_user');
-    
-    let state = { categorias: {arriendo:0, mercaderia:0, transporte:0, salud:0, ahorro:0, personal:0}, presupuestos_base: {}, historial: [] };
+    let state = { categorias: {}, historial: [] };
 
     async function loadCloud() {
         if (!GH_TOKEN || !GIST_ID || !GROQ_KEY || !USER_NAME) {
@@ -52,19 +74,13 @@
             if(!GROQ_KEY) localStorage.setItem('h_groq', prompt("Groq API Key:"));
             location.reload(); return;
         }
-
         try {
-            const res = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
-                headers: { "Authorization": `token ${GH_TOKEN}` }
-            });
+            const res = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers: { "Authorization": `token ${GH_TOKEN}` } });
             const data = await res.json();
-            const content = data.files["hakai.json"].content;
-            if (content && content !== "{}") state = JSON.parse(content);
-            
+            state = JSON.parse(data.files["hakai.json"].content);
             document.getElementById('user-display').innerText = USER_NAME;
-            document.getElementById('response').innerText = "Hakai Online.";
-            document.getElementById('user-input').placeholder = "Comando...";
-        } catch (e) { document.getElementById('response').innerText = "Error de config. Revisa Token/Gist."; }
+            document.getElementById('response').innerText = "Hakai Sincronizada.";
+        } catch (e) { document.getElementById('response').innerText = "Error de conexión."; }
     }
 
     async function processData() {
@@ -74,8 +90,6 @@
         if (!input) return;
 
         resDiv.innerText = "...";
-        const ahora = new Date().toLocaleString('es-CL', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
-
         try {
             const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
                 headers: { "Authorization": `Bearer ${GROQ_KEY}`, "Content-Type": "application/json" },
@@ -83,42 +97,28 @@
                 body: JSON.stringify({ 
                     model: "llama-3.3-70b-versatile",
                     messages: [
-                        { role: "system", content: `IA de finanzas. REGLAS: 1. Si pide "detalle", muestra saldos. Si pide "detalle completo", muestra saldos + historial cronológico. 2. Respuestas normales < 10 palabras. 3. JSON SIEMPRE al final tras ###. 4. Sobras van a ahorro. Gastos extra restan de ahorro. 5. Cada movimiento se registra en 'historial' como: "DD/MM HH:MM | Acción | $Monto | por ${USER_NAME}".` },
+                        { role: "system", content: `IA de finanzas. Respuestas < 10 palabras (salvo detalle). JSON tras ###. Historial: [Fecha] | [Acción] | [Monto] | por ${USER_NAME}.` },
                         { role: "user", content: `Estado: ${JSON.stringify(state)}. Comando: ${input}` }
                     ],
                     temperature: 0
                 }),
             });
-
             const data = await response.json();
             const rawText = data.choices[0].message.content;
             
             if (rawText.includes('###')) {
                 const parts = rawText.split('###');
-                const mensaje = parts[0].trim();
-                const jsonPart = parts[parts.length - 1].trim(); // Tomar siempre la última parte para el JSON
-                
-                try {
-                    const cleanJson = jsonPart.match(/\{[\s\S]*\}/)[0]; // Extraer solo el bloque de llaves
-                    state = JSON.parse(cleanJson);
-                    
-                    await fetch(`https://api.github.com/gists/${GIST_ID}`, {
-                        method: 'PATCH',
-                        headers: { "Authorization": `token ${GH_TOKEN}` },
-                        body: JSON.stringify({ files: { "hakai.json": { content: JSON.stringify(state) } } })
-                    });
-                    resDiv.innerText = mensaje;
-                } catch(e) {
-                    console.error("JSON Error:", jsonPart);
-                    resDiv.innerText = "Error al procesar datos. Intenta de nuevo.";
-                }
+                state = JSON.parse(parts[parts.length - 1].trim().match(/\{[\s\S]*\}/)[0]);
+                await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                    method: 'PATCH',
+                    headers: { "Authorization": `token ${GH_TOKEN}` },
+                    body: JSON.stringify({ files: { "hakai.json": { content: JSON.stringify(state) } } })
+                });
+                resDiv.innerText = parts[0].trim();
             } else { resDiv.innerText = rawText.trim(); }
             inputField.value = "";
-            resDiv.scrollTop = 0;
         } catch (e) { resDiv.innerText = "Error de red."; }
     }
-
-    function resetConfig() { localStorage.clear(); location.reload(); }
     loadCloud();
 </script>
 </body>
