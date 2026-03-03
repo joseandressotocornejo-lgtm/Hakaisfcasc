@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>| HAKAI |</title>
+    <title>HAKAI | Cloud Safe</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
         * { margin:0; padding:0; box-sizing:border-box; font-family: 'Inter', sans-serif; }
@@ -15,7 +15,9 @@
         .title { font-size:38px; font-weight:300; color:white; letter-spacing: 6px; text-transform: uppercase; margin-left: 60px; margin-bottom: 10px; }
         .divider { height:1px; background: linear-gradient(to right, transparent, rgba(255,255,255,0.1), transparent); margin:25px 0; }
         input { width: 100%; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); padding: 18px; border-radius: 18px; color: white; outline: none; transition: 0.4s; font-size: 14px; }
-        #response { margin-top: 25px; font-size: 13px; color: rgba(255,255,255,0.8); line-height: 1.5; min-height: 50px; white-space: pre-wrap; max-height: 350px; overflow-y: auto; }
+        #response { margin-top: 25px; font-size: 13px; color: rgba(255,255,255,0.8); line-height: 1.5; min-height: 50px; white-space: pre-wrap; max-height: 350px; overflow-y: auto; padding-right: 5px; }
+        #response::-webkit-scrollbar { width: 4px; }
+        #response::-webkit-scrollbar-thumb { background: rgba(255,0,204,0.3); border-radius: 10px; }
         .user-tag { position: absolute; top: 20px; right: 40px; font-size: 10px; color: #ff00cc; letter-spacing: 2px; }
         .reset-btn { position: absolute; bottom: 15px; left: 40px; font-size: 8px; color: rgba(255,255,255,0.1); cursor: pointer; text-decoration: none; }
     </style>
@@ -45,11 +47,10 @@
     async function loadCloud() {
         if (!GH_TOKEN || !GIST_ID || !GROQ_KEY || !USER_NAME) {
             if(!USER_NAME) localStorage.setItem('h_user', prompt("¿Quién eres?"));
-            if(!GH_TOKEN) localStorage.setItem('h_gh_token', prompt("GitHub Token (nuevo):"));
+            if(!GH_TOKEN) localStorage.setItem('h_gh_token', prompt("GitHub Token:"));
             if(!GIST_ID) localStorage.setItem('h_gist_id', prompt("Gist ID:"));
             if(!GROQ_KEY) localStorage.setItem('h_groq', prompt("Groq API Key:"));
-            location.reload();
-            return;
+            location.reload(); return;
         }
 
         try {
@@ -58,14 +59,12 @@
             });
             const data = await res.json();
             const content = data.files["hakai.json"].content;
-            if (content !== "{}") state = JSON.parse(content);
+            if (content && content !== "{}") state = JSON.parse(content);
             
-            document.getElementById('user-display').innerText = localStorage.getItem('h_user');
+            document.getElementById('user-display').innerText = USER_NAME;
             document.getElementById('response').innerText = "Hakai Online.";
-            document.getElementById('user-input').placeholder = "Escribe un comando...";
-        } catch (e) { 
-            document.getElementById('response').innerText = "Error de config. Revisa el Token o Gist ID."; 
-        }
+            document.getElementById('user-input').placeholder = "Comando...";
+        } catch (e) { document.getElementById('response').innerText = "Error de config. Revisa Token/Gist."; }
     }
 
     async function processData() {
@@ -84,7 +83,7 @@
                 body: JSON.stringify({ 
                     model: "llama-3.3-70b-versatile",
                     messages: [
-                        { role: "system", content: `IA compartida. Responde <10 palabras (salvo detalle). JSON tras ###. Sobras a ahorro. Sobre-gasto resta de ahorro. Historial: [Fecha] | [Acción] | [Monto] | por ${USER_NAME}.` },
+                        { role: "system", content: `IA de finanzas. REGLAS: 1. Si pide "detalle", muestra saldos. Si pide "detalle completo", muestra saldos + historial cronológico. 2. Respuestas normales < 10 palabras. 3. JSON SIEMPRE al final tras ###. 4. Sobras van a ahorro. Gastos extra restan de ahorro. 5. Cada movimiento se registra en 'historial' como: "DD/MM HH:MM | Acción | $Monto | por ${USER_NAME}".` },
                         { role: "user", content: `Estado: ${JSON.stringify(state)}. Comando: ${input}` }
                     ],
                     temperature: 0
@@ -95,17 +94,27 @@
             const rawText = data.choices[0].message.content;
             
             if (rawText.includes('###')) {
-                const [mensaje, jsonPart] = rawText.split('###');
-                state = JSON.parse(jsonPart.trim().replace(/^[^{]*/, '').replace(/[^}]*$/, ''));
+                const parts = rawText.split('###');
+                const mensaje = parts[0].trim();
+                const jsonPart = parts[parts.length - 1].trim(); // Tomar siempre la última parte para el JSON
                 
-                await fetch(`https://api.github.com/gists/${GIST_ID}`, {
-                    method: 'PATCH',
-                    headers: { "Authorization": `token ${GH_TOKEN}` },
-                    body: JSON.stringify({ files: { "hakai.json": { content: JSON.stringify(state) } } })
-                });
-                resDiv.innerText = mensaje.trim();
+                try {
+                    const cleanJson = jsonPart.match(/\{[\s\S]*\}/)[0]; // Extraer solo el bloque de llaves
+                    state = JSON.parse(cleanJson);
+                    
+                    await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                        method: 'PATCH',
+                        headers: { "Authorization": `token ${GH_TOKEN}` },
+                        body: JSON.stringify({ files: { "hakai.json": { content: JSON.stringify(state) } } })
+                    });
+                    resDiv.innerText = mensaje;
+                } catch(e) {
+                    console.error("JSON Error:", jsonPart);
+                    resDiv.innerText = "Error al procesar datos. Intenta de nuevo.";
+                }
             } else { resDiv.innerText = rawText.trim(); }
             inputField.value = "";
+            resDiv.scrollTop = 0;
         } catch (e) { resDiv.innerText = "Error de red."; }
     }
 
