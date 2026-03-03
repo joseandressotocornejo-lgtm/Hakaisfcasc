@@ -3,25 +3,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hakai | Sistema de Flujo</title>
+    <title>Hakai</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
         * { margin:0; padding:0; box-sizing:border-box; font-family: 'Inter', sans-serif; }
         body { height:100vh; display:flex; flex-direction:column; justify-content:center; align-items:center; background:#070012; overflow:hidden; }
-        body::before { content:""; position:absolute; width:600px; height:600px; background: radial-gradient(circle, rgba(255,0,255,0.12), transparent 70%); filter: blur(120px); right:5%; top:15%; z-index: -1; }
-        .card { width:90%; max-width:500px; border-radius:40px; padding:40px; position:relative; background: rgba(255,255,255,0.02); backdrop-filter: blur(30px); border:1px solid rgba(255,0,200,0.2); box-shadow: 0 20px 50px rgba(0,0,0,0.6); }
+
+        body::before {
+            content:""; position:absolute; width:600px; height:600px;
+            background: radial-gradient(circle, rgba(255,0,255,0.12), transparent 70%);
+            filter: blur(120px); right:5%; top:15%; z-index: -1;
+        }
+
+        .card {
+            width:90%; max-width:500px; border-radius:40px; padding:40px; position:relative;
+            background: rgba(255,255,255,0.02); backdrop-filter: blur(30px);
+            border:1px solid rgba(255,0,200,0.2);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+        }
+
         .lightning { position:absolute; left:-35px; top:-25px; width:110px; z-index: 2; }
         .lightning path { stroke:#ff00cc; stroke-width:6; fill:none; filter: drop-shadow(0 0 12px #ff00cc); }
-        .title { font-size:38px; font-weight:300; color:white; letter-spacing: 6px; text-transform: uppercase; margin-left: 60px; margin-bottom: 10px; }
+
+        .title { 
+            font-size:38px; font-weight:300; color:white; 
+            letter-spacing: 6px; text-transform: uppercase;
+            margin-left: 60px; 
+            margin-bottom: 10px;
+        }
+
         .divider { height:1px; background: linear-gradient(to right, transparent, rgba(255,255,255,0.1), transparent); margin:25px 0; }
-        .input-area { margin-top: 20px; }
-        input { width: 100%; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); padding: 18px; border-radius: 18px; color: white; outline: none; transition: 0.4s; font-size: 14px; }
-        input:focus { border-color: #ff00cc; background: rgba(255,0,200,0.04); }
-        #response { margin-top: 20px; font-size: 14px; color: rgba(255,255,255,0.5); line-height: 1.6; min-height: 40px; }
+
+        .input-area { margin-top: 20px; position: relative; }
+        input {
+            width: 100%; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1);
+            padding: 18px; border-radius: 18px; color: white; outline: none; transition: 0.4s;
+            font-size: 14px; font-weight: 300;
+        }
+        input:focus { border-color: #ff00cc; background: rgba(255,0,200,0.04); box-shadow: 0 0 15px rgba(255,0,200,0.1); }
+
+        #response { 
+            margin-top: 20px; font-size: 14px; color: rgba(255,255,255,0.5); 
+            line-height: 1.6; min-height: 40px; font-weight: 300;
+        }
+
         .buttons { display:flex; gap:12px; margin-top:30px; }
-        button { flex:1; padding:14px; border-radius:16px; border:1px solid rgba(255,255,255,0.05); background: rgba(255,255,255,0.03); color:rgba(255,255,255,0.6); cursor:pointer; font-size: 11px; letter-spacing: 1px; transition: 0.3s; }
-        .confirm { background: linear-gradient(45deg,#9d00ff,#ff00cc); border:none; color:white; }
-        .confirm:hover { box-shadow:0 10px 20px rgba(255,0,200,0.4); transform:translateY(-2px); }
+        button { 
+            flex:1; padding:14px; border-radius:16px; border:1px solid rgba(255,255,255,0.05); 
+            background: rgba(255,255,255,0.03); color:rgba(255,255,255,0.6); 
+            cursor:pointer; transition:0.3s; font-size: 11px; letter-spacing: 1px;
+        }
+        button:hover { background: rgba(255,255,255,0.07); color:white; }
+        
+        .confirm { 
+            background: linear-gradient(45deg,#9d00ff,#ff00cc); border:none; color:white; 
+            box-shadow:0 10px 20px rgba(255,0,200,0.2);
+        }
+        .confirm:hover { box-shadow:0 15px 30px rgba(255,0,200,0.4); transform:translateY(-2px); }
+        
     </style>
 </head>
 <body>
@@ -30,12 +69,17 @@
     <svg class="lightning" viewBox="0 0 100 150">
         <path d="M60 0 L20 80 L55 80 L35 150 L85 60 L50 60 Z"/>
     </svg>
+
     <div class="title">Hakai</div>
+    
     <div class="divider"></div>
+
     <div class="input-area">
-        <input type="text" id="user-input" placeholder="Dime qué ocurrió hoy..." onkeypress="if(event.key==='Enter') processData()">
+        <input type="text" id="user-input" placeholder="Dime qué ocurrió hoy..." onkeypress="handleKeyPress(event)">
     </div>
+    
     <div id="response">Hakai en línea. Lista para procesar flujo.</div>
+
     <div class="buttons">
         <button class="confirm" onclick="processData()">Sincronizar</button>
         <button onclick="exportarExcel()">Reporte</button>
@@ -43,15 +87,20 @@
 </div>
 
 <script>
-    const API_KEY = "AIzaSyBLYst6oGbjZ-QkFaLBQyiY3fwg334NGZw"; // Tu clave ya está aquí
-    let state = JSON.parse(localStorage.getItem('hakai_v4')) || {
+    const HF_TOKEN = "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"; 
+
+    let state = JSON.parse(localStorage.getItem('hakai_v5')) || {
         total: 0,
         categorias: { arriendo: 0, mercaderia: 0, transporte: 0, salud: 0, ahorro: 0, personal: 0 },
         logs: []
     };
 
     function updateUI() {
-        localStorage.setItem('hakai_v4', JSON.stringify(state));
+        localStorage.setItem('hakai_v5', JSON.stringify(state));
+    }
+
+    function handleKeyPress(e) {
+        if (e.key === 'Enter') processData();
     }
 
     async function processData() {
@@ -61,44 +110,62 @@
         if (!input) return;
 
         resDiv.style.color = "#ff4df3";
-        resDiv.innerText = "Hakai sincronizando...";
+        resDiv.innerText = "Hakai sincronizando con DeepSeek...";
 
-        const prompt = `Eres Hakai, inteligencia financiera. Estado actual: ${JSON.stringify(state)}. 
-        Reglas: 
-        1. Si excede presupuesto en CUALQUIER categoría, resta de 'ahorro' y avisa que se repondrá el próximo mes. 
-        2. Aprende hábitos. 
-        3. Si pregunta saldo o detalles, responde sutilmente.
-        Usuario dice: "${input}". 
-        Responde breve y termina SIEMPRE con ### seguido del objeto JSON del estado actualizado.`;
+        const prompt = `<|system|>Eres Hakai, asistente financiero minimalista.
+        REGLAS:
+        1. Si el usuario gasta en cualquier categoría y excede el presupuesto, resta la diferencia de 'ahorro' y avisa que se repondrá el mes próximo.
+        2. Si el usuario define presupuestos, actualiza el estado.
+        3. Al final de tu respuesta de texto, añade SIEMPRE el delimitador ### seguido del objeto JSON completo actualizado.
+        4. Sé breve y elegante.
+        Estado actual: ${JSON.stringify(state)}
+        <|user|>${input}
+        <|assistant|>`;
 
         try {
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+            const response = await fetch("https://api-inference.huggingface.co/models/deepseek-ai/DeepSeek-R1-Distill-Qwen-32B", {
+                headers: { 
+                    "Authorization": `Bearer ${HF_TOKEN}`, 
+                    "Content-Type": "application/json" 
+                },
+                method: "POST",
+                body: JSON.stringify({
+                    inputs: prompt,
+                    parameters: { max_new_tokens: 500, return_full_text: false }
+                }),
             });
 
-            const dataIA = await response.json();
-            const textoIA = dataIA.candidates[0].content.parts[0].text;
-            const [mensaje, nuevoEstado] = textoIA.split('###');
+            const result = await response.json();
+            const rawText = result[0].generated_text;
 
-            if(nuevoEstado) {
-                state = JSON.parse(nuevoEstado.trim());
-                updateUI();
+            // Separar mensaje de JSON
+            const parts = rawText.split('###');
+            const mensaje = parts[0].trim();
+            const jsonPart = parts[1];
+
+            if(jsonPart) {
+                try {
+                    state = JSON.parse(jsonPart.trim());
+                    updateUI();
+                } catch(e) { console.error("Error parseando JSON de la IA"); }
             }
 
             resDiv.style.color = "rgba(255,255,255,0.8)";
-            resDiv.innerText = mensaje.trim();
+            resDiv.innerText = mensaje.replace(/<think>[\s\S]*?<\/think>/, '').trim(); // Limpia pensamientos de DeepSeek
             inputField.value = "";
+
         } catch (e) {
-            resDiv.innerText = "Error en el núcleo Hakai.";
+            resDiv.innerText = "Error: El núcleo está saturado o el Token es inválido.";
+            console.error(e);
         }
     }
 
     function exportarExcel() {
-        let content = "Fecha,Accion\n" + state.logs.map(l => `${l.date},${l.msg}`).join("\n");
+        const content = "Fecha,Estado Final\n" + new Date().toLocaleDateString() + "," + JSON.stringify(state);
         const blob = new Blob([content], {type: 'text/csv'});
-        window.open(URL.createObjectURL(blob));
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'Hakai_Reporte.csv'; a.click();
     }
 </script>
 </body>
